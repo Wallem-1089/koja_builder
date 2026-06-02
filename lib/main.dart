@@ -37,6 +37,35 @@ class Subject {
   }
 }
 
+class Question {
+  //final int? number;
+  final String question;
+
+  final Map<String, String> options;
+
+  final String answer;
+
+  final String explanation;
+
+  Question({
+    //this.number,
+    required this.question,
+    required this.options,
+    required this.answer,
+    required this.explanation,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      // "number": number,
+      "question": question,
+      "options": options,
+      "answer": answer,
+      "explanation": explanation,
+    };
+  }
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -92,6 +121,40 @@ class _HomePageState extends State<HomePage> {
               Navigator.pop(context);
             },
             child: const Text("Create"),
+          ),
+        ],
+      );
+    },
+  );
+}
+void deleteSubject(int index) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Delete Subject'),
+
+        content: Text(
+          'Delete "${subjects[index].name}" and all its questions?',
+        ),
+
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
+
+          FilledButton(
+            onPressed: () {
+              setState(() {
+                subjects.removeAt(index);
+              });
+
+              Navigator.pop(context);
+            },
+            child: const Text('Delete'),
           ),
         ],
       );
@@ -162,8 +225,20 @@ class _HomePageState extends State<HomePage> {
               '${subject.questions.length} Questions',
             ),
 
-            trailing: const Icon(
-              Icons.arrow_forward_ios,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete,
+                    color: Colors.red,
+                  ),
+                  onPressed: () {
+                    deleteSubject(index);
+                  },
+                ),
+                const Icon(Icons.arrow_forward_ios),
+              ],
             ),
 
             onTap: () {
@@ -236,7 +311,7 @@ class _SubjectPageState extends State<SubjectPage> {
 
       setState(() {
 
-        widget.subject.questions.add(
+        /*widget.subject.questions.add(
           Question(
             number:
                 widget.subject.questions.length + 1,
@@ -250,11 +325,61 @@ class _SubjectPageState extends State<SubjectPage> {
             explanation:
                 question.explanation,
           ),
-        );
+        );*/
+        widget.subject.questions.add(question);
 
       });
     }
   }
+  void deleteQuestion(int index) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Delete Question'),
+        content: const Text(
+          'Are you sure you want to delete this question?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              setState(() {
+                widget.subject.questions.removeAt(index);
+
+                // Renumber remaining questions
+                /*for (int i = 0;
+                    i < widget.subject.questions.length;
+                    i++) {
+
+                  final old =
+                      widget.subject.questions[i];
+
+                  widget.subject.questions[i] =
+                      Question(
+                    //number: i + 1,
+                    question: old.question,
+                    options: old.options,
+                    answer: old.answer,
+                    explanation: old.explanation,
+                  );
+                }*/
+              });
+
+              Navigator.pop(context);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -294,7 +419,7 @@ class _SubjectPageState extends State<SubjectPage> {
                 return ListTile(
                   leading: CircleAvatar(
                     child: Text(
-                      question.number.toString(),
+                      '${index + 1}',
                     ),
                   ),
 
@@ -304,6 +429,16 @@ class _SubjectPageState extends State<SubjectPage> {
 
                   subtitle: Text(
                     "Answer: ${question.answer}",
+                  ),
+
+                  trailing: IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.red,
+                    ),
+                    onPressed: () {
+                      deleteQuestion(index);
+                    },
                   ),
                 );
               },
@@ -317,36 +452,6 @@ class _SubjectPageState extends State<SubjectPage> {
     );
   }
 }
-
-class Question {
-  final int number;
-  final String question;
-
-  final Map<String, String> options;
-
-  final String answer;
-
-  final String explanation;
-
-  Question({
-    required this.number,
-    required this.question,
-    required this.options,
-    required this.answer,
-    required this.explanation,
-  });
-
-  Map<String, dynamic> toJson() {
-    return {
-      "number": number,
-      "question": question,
-      "options": options,
-      "answer": answer,
-      "explanation": explanation,
-    };
-  }
-}
-
 
 class AddQuestionPage extends StatefulWidget {
   const AddQuestionPage({super.key});
@@ -485,25 +590,17 @@ class _AddQuestionPageState
             FilledButton(
               onPressed: () {
 
-                final question =
-                    Question(
-                  number: 1,
-                  question:
-                      questionController.text,
-                  options: {
-                    "A":
-                        aController.text,
-                    "B":
-                        bController.text,
-                    "C":
-                        cController.text,
-                    "D":
-                        dController.text,
-                  },
-                  answer: answer,
-                  explanation:
-                      explanationController.text,
-                );
+                final question = Question(
+                    question: questionController.text,
+                    options: {
+                      "A": aController.text,
+                      "B": bController.text,
+                      "C": cController.text,
+                      "D": dController.text,
+                    },
+                    answer: answer,
+                    explanation: explanationController.text,
+                  );
 
                 Navigator.pop(
                   context,
