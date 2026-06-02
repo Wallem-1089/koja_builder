@@ -20,6 +20,22 @@ class KojaQuestionBuilder extends StatelessWidget {
     );
   }
 }
+class Subject {
+  final String name;
+  final List<Question> questions;
+
+  Subject({
+    required this.name,
+    required this.questions,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      "subjectName": name,
+      "questions": questions.map((q) => q.toJson()).toList(),
+    };
+  }
+}
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -30,15 +46,66 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
 
-  final List<Question> questions = [];
+  //final List<Question> questions = [];
+  final List<Subject> subjects = [];
+  void addSubject() {
+  final controller = TextEditingController();
 
-  void addQuestion(Question question) {
+  showDialog(
+    context: context,
+    builder: (_) {
+      return AlertDialog(
+        title: const Text("Add Subject"),
+
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: "Subject Name",
+          ),
+        ),
+
+        actions: [
+
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text("Cancel"),
+          ),
+
+          FilledButton(
+            onPressed: () {
+
+              if (controller.text.trim().isEmpty) {
+                return;
+              }
+
+              setState(() {
+                subjects.add(
+                  Subject(
+                    name: controller.text.trim(),
+                    questions: [],
+                  ),
+                );
+              });
+
+              Navigator.pop(context);
+            },
+            child: const Text("Create"),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+ /* void addQuestion(Question question) {
     setState(() {
       questions.add(question);
     });
-  }
+  }*/
 
-  void exportQuestions() {
+  /*void exportQuestions() {
 
   final jsonString =
       const JsonEncoder.withIndent('  ')
@@ -49,47 +116,76 @@ class _HomePageState extends State<HomePage> {
   );
 
   print(jsonString);
-}
+}*/
+/*void exportSubject(Subject subject) {
+
+  final jsonString =
+      const JsonEncoder.withIndent('  ')
+          .convert(
+    subject.toJson(),
+  );
+
+  print(jsonString);
+}*/
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Koja Question Builder'),
-        actions: [
+        /*actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            onPressed: exportQuestions,
+            onPressed: () => exportSubject, //exportQuestions,
           ),
-        ],
+        ],*/
       ),
 
-      body: questions.isEmpty
-          ? const Center(
-              child: Text(
-                'No Questions Added',
-              ),
-            )
-          : ListView.builder(
-              itemCount: questions.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  leading: CircleAvatar(
-                    child: Text(
-                      '${questions[index].number}',
-                    ),
-                  ),
-                  title: Text(
-                    questions[index].question,
-                  ),
-                  subtitle: Text(
-                    'Answer: ${questions[index].answer}',
-                  ),
-                );
-              },
+      body: subjects.isEmpty
+    ? const Center(
+        child: Text(
+          'No Subjects Added',
+        ),
+      )
+    : ListView.builder(
+        itemCount: subjects.length,
+        itemBuilder: (context, index) {
+
+          final subject = subjects[index];
+
+          return ListTile(
+            leading: const Icon(Icons.book),
+
+            title: Text(subject.name),
+
+            subtitle: Text(
+              '${subject.questions.length} Questions',
             ),
 
+            trailing: const Icon(
+              Icons.arrow_forward_ios,
+            ),
+
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SubjectPage(
+                    subject: subject,
+                  ),
+                ),
+              ).then((_) {
+                setState(() {});
+              });
+            },
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton(
+      onPressed: addSubject,
+      child: const Icon(Icons.add),
+    ),
+      /*floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () async {
 
@@ -106,6 +202,117 @@ class _HomePageState extends State<HomePage> {
             addQuestion(question);
           }
         },
+      ),*/
+    );
+  }
+}
+class SubjectPage extends StatefulWidget {
+  final Subject subject;
+
+  const SubjectPage({
+    super.key,
+    required this.subject,
+  });
+
+  @override
+  State<SubjectPage> createState() =>
+      _SubjectPageState();
+}
+
+class _SubjectPageState extends State<SubjectPage> {
+
+  Future<void> addQuestion() async {
+
+    final question =
+        await Navigator.push<Question>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            const AddQuestionPage(),
+      ),
+    );
+
+    if (question != null) {
+
+      setState(() {
+
+        widget.subject.questions.add(
+          Question(
+            number:
+                widget.subject.questions.length + 1,
+
+            question: question.question,
+
+            options: question.options,
+
+            answer: question.answer,
+
+            explanation:
+                question.explanation,
+          ),
+        );
+
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
+    return Scaffold(
+  appBar: AppBar(
+  title: Text(widget.subject.name),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.download),
+      onPressed: () {
+        final jsonString =
+            const JsonEncoder.withIndent('  ')
+                .convert(widget.subject.toJson());
+
+        debugPrint(jsonString);
+      },
+    ),
+  ],
+),
+
+      body: widget.subject.questions.isEmpty
+          ? const Center(
+              child: Text(
+                "No Questions Added",
+              ),
+            )
+          : ListView.builder(
+              itemCount:
+                  widget.subject.questions.length,
+
+              itemBuilder: (context, index) {
+
+                final question =
+                    widget.subject.questions[index];
+
+                return ListTile(
+                  leading: CircleAvatar(
+                    child: Text(
+                      question.number.toString(),
+                    ),
+                  ),
+
+                  title: Text(
+                    question.question,
+                  ),
+
+                  subtitle: Text(
+                    "Answer: ${question.answer}",
+                  ),
+                );
+              },
+            ),
+
+      floatingActionButton:
+          FloatingActionButton(
+        onPressed: addQuestion,
+        child: const Icon(Icons.add),
       ),
     );
   }
