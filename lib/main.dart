@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:file_picker/file_picker.dart';
 
 void main() {
   runApp(const KojaQuestionBuilder());
@@ -310,27 +313,33 @@ class _SubjectPageState extends State<SubjectPage> {
     if (question != null) {
 
       setState(() {
-
-        /*widget.subject.questions.add(
-          Question(
-            number:
-                widget.subject.questions.length + 1,
-
-            question: question.question,
-
-            options: question.options,
-
-            answer: question.answer,
-
-            explanation:
-                question.explanation,
-          ),
-        );*/
         widget.subject.questions.add(question);
 
       });
     }
   }
+  Future<void> editQuestion(int index) async {
+
+  final updatedQuestion =
+      await Navigator.push<Question>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => AddQuestionPage(
+        question:
+            widget.subject.questions[index],
+      ),
+    ),
+  );
+
+  if (updatedQuestion != null) {
+
+    setState(() {
+      widget.subject.questions[index] =
+          updatedQuestion;
+    });
+
+  }
+}
   void deleteQuestion(int index) {
   showDialog(
     context: context,
@@ -380,23 +389,80 @@ class _SubjectPageState extends State<SubjectPage> {
     },
   );
 }
+Future<void> exportSubjectToFile() async {
+  try {
+
+    final jsonString =
+        const JsonEncoder.withIndent('  ')
+            .convert(widget.subject.toJson());
+
+    final documentsDir =
+        await getApplicationDocumentsDirectory();
+
+    final kojaFolder = Directory(
+      '${documentsDir.path}/Koja Question Banks',
+    );
+
+    if (!await kojaFolder.exists()) {
+      await kojaFolder.create(
+        recursive: true,
+      );
+    }
+
+    final fileName =
+        widget.subject.name
+            .toLowerCase()
+            .replaceAll(' ', '_');
+
+    final file = File(
+      '${kojaFolder.path}/$fileName.json',
+    );
+
+    await file.writeAsString(
+      jsonString,
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          'Exported to ${file.path}',
+        ),
+      ),
+    );
+
+  } catch (e) {
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          'Export failed: $e',
+        ),
+      ),
+    );
+  }
+}
 
   @override
   Widget build(BuildContext context) {
 
     return Scaffold(
   appBar: AppBar(
-  title: Text(widget.subject.name),
+  title: Text(
+    widget.subject.name,
+  ),
+
   actions: [
     IconButton(
-      icon: const Icon(Icons.download),
-      onPressed: () {
-        final jsonString =
-            const JsonEncoder.withIndent('  ')
-                .convert(widget.subject.toJson());
-
-        debugPrint(jsonString);
-      },
+      icon: const Icon(
+        Icons.download,
+      ),
+      onPressed: exportSubjectToFile,
     ),
   ],
 ),
@@ -417,30 +483,44 @@ class _SubjectPageState extends State<SubjectPage> {
                     widget.subject.questions[index];
 
                 return ListTile(
-                  leading: CircleAvatar(
-                    child: Text(
-                      '${index + 1}',
-                    ),
-                  ),
+  leading: CircleAvatar(
+    child: Text(
+      '${index + 1}',
+    ),
+  ),
 
-                  title: Text(
-                    question.question,
-                  ),
+  title: Text(
+    question.question,
+  ),
 
-                  subtitle: Text(
-                    "Answer: ${question.answer}",
-                  ),
+  subtitle: Text(
+    "Answer: ${question.answer}",
+  ),
 
-                  trailing: IconButton(
-                    icon: const Icon(
-                      Icons.delete,
-                      color: Colors.red,
-                    ),
-                    onPressed: () {
-                      deleteQuestion(index);
-                    },
-                  ),
-                );
+  trailing: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+
+      IconButton(
+        icon: const Icon(Icons.edit),
+        onPressed: () {
+          editQuestion(index);
+        },
+      ),
+
+      IconButton(
+        icon: const Icon(
+          Icons.delete,
+          color: Colors.red,
+        ),
+        onPressed: () {
+          deleteQuestion(index);
+        },
+      ),
+
+    ],
+  ),
+);
               },
             ),
 
@@ -454,7 +534,12 @@ class _SubjectPageState extends State<SubjectPage> {
 }
 
 class AddQuestionPage extends StatefulWidget {
-  const AddQuestionPage({super.key});
+  final Question? question;
+
+  const AddQuestionPage({
+    super.key,
+    this.question,
+  });
 
   @override
   State<AddQuestionPage> createState() =>
@@ -485,11 +570,41 @@ class _AddQuestionPageState
   String answer = "A";
 
   @override
+void initState() {
+  super.initState();
+
+  if (widget.question != null) {
+    questionController.text =
+        widget.question!.question;
+
+    aController.text =
+        widget.question!.options["A"] ?? "";
+
+    bController.text =
+        widget.question!.options["B"] ?? "";
+
+    cController.text =
+        widget.question!.options["C"] ?? "";
+
+    dController.text =
+        widget.question!.options["D"] ?? "";
+
+    answer = widget.question!.answer;
+
+    explanationController.text =
+        widget.question!.explanation;
+  }
+}
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title:
-            const Text("Add Question"),
+        title: Text(
+        widget.question == null
+            ? "Add Question"
+            : "Edit Question",
+      ),
       ),
 
       body: SingleChildScrollView(
@@ -607,8 +722,11 @@ class _AddQuestionPageState
                   question,
                 );
               },
-              child:
-                  const Text("Save"),
+              child: Text(
+                widget.question == null
+                    ? "Save"
+                    : "Update",
+              ),
             ),
           ],
         ),
