@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
+//import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 
 void main() {
   runApp(const KojaQuestionBuilder());
@@ -38,6 +40,22 @@ class Subject {
       "questions": questions.map((q) => q.toJson()).toList(),
     };
   }
+  factory Subject.fromJson(
+      Map<String, dynamic> json,
+      ) {
+
+        return Subject(
+          name: json['subjectName'],
+
+          questions:
+              (json['questions'] as List)
+                  .map(
+                    (q) =>
+                        Question.fromJson(q),
+                  )
+                  .toList(),
+        );
+      }
 }
 
 class Question {
@@ -66,6 +84,21 @@ class Question {
       "answer": answer,
       "explanation": explanation,
     };
+  }
+
+  factory Question.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return Question(
+      question: json['question'],
+      options:
+          Map<String, String>.from(
+        json['options'],
+      ),
+      answer: json['answer'],
+      explanation:
+          json['explanation'],
+    );
   }
 }
 
@@ -165,46 +198,245 @@ void deleteSubject(int index) {
   );
 }
 
- /* void addQuestion(Question question) {
+Future<void> importSubject() async {
+
+  try {
+
+    final result =
+        await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    final file =
+        File(result.files.single.path!);
+
+    final jsonString =
+        await file.readAsString();
+
+    final jsonData =
+        jsonDecode(jsonString);
+
+    final subject =
+    Subject.fromJson(jsonData);
+
+    final alreadyExists =
+        subjects.any(
+          (s) =>
+              s.name.toLowerCase() ==
+              subject.name.toLowerCase(),
+        );
+
+    if (alreadyExists) {
+
+    final shouldReplace =
+        await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            'Subject Exists',
+          ),
+          content: Text(
+            '${subject.name} already exists.\n\nReplace it?',
+          ),
+          actions: [
+
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  false,
+                );
+              },
+              child: const Text(
+                'Cancel',
+              ),
+            ),
+
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  true,
+                );
+              },
+              child: const Text(
+                'Replace',
+              ),
+            ),
+
+          ],
+        );
+      },
+    );
+
+    if (shouldReplace == true) {
+
+      final index =
+          subjects.indexWhere(
+        (s) =>
+            s.name.toLowerCase() ==
+            subject.name.toLowerCase(),
+      );
+
+      setState(() {
+        subjects[index] = subject;
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            '${subject.name} replaced',
+          ),
+        ),
+      );
+    }
+
+    return;
+  }
+
     setState(() {
-      questions.add(question);
+      subjects.add(subject);
     });
-  }*/
 
-  /*void exportQuestions() {
+    if (!mounted) return;
 
-  final jsonString =
-      const JsonEncoder.withIndent('  ')
-          .convert(
-    questions
-        .map((q) => q.toJson())
-        .toList(),
-  );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          '${subject.name} imported successfully',
+        ),
+      ),
+    );
 
-  print(jsonString);
-}*/
-/*void exportSubject(Subject subject) {
+  } catch (e) {
 
-  final jsonString =
-      const JsonEncoder.withIndent('  ')
-          .convert(
-    subject.toJson(),
-  );
+    if (!mounted) return;
 
-  print(jsonString);
-}*/
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          'Import failed: $e',
+        ),
+      ),
+    );
+  }
+}
+Future<void> importFolder() async {
+
+  try {
+
+    String? selectedDirectory =
+        await FilePicker.platform
+            .getDirectoryPath();
+
+    if (selectedDirectory == null) {
+      return;
+    }
+
+    final folder =
+        Directory(selectedDirectory);
+
+    final jsonFiles =
+        folder
+            .listSync()
+            .where(
+              (file) =>
+                  file is File &&
+                  file.path.endsWith('.json'),
+            )
+            .cast<File>()
+            .toList();
+
+    int importedCount = 0;
+
+    for (final file in jsonFiles) {
+
+      try {
+
+        final jsonString =
+            await file.readAsString();
+
+        final jsonData =
+            jsonDecode(jsonString);
+
+        final subject =
+            Subject.fromJson(jsonData);
+
+        final alreadyExists =
+            subjects.any(
+          (s) =>
+              s.name.toLowerCase() ==
+              subject.name.toLowerCase(),
+        );
+
+        if (!alreadyExists) {
+
+          subjects.add(subject);
+
+          importedCount++;
+        }
+
+      } catch (_) {
+
+        // Skip invalid JSON files
+
+      }
+    }
+
+    setState(() {});
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          '$importedCount subjects imported',
+        ),
+      ),
+    );
+
+  } catch (e) {
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          'Import failed: $e',
+        ),
+      ),
+    );
+  }
+}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Koja Question Builder'),
-        /*actions: [
+        actions: [
           IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: () => exportSubject, //exportQuestions,
+            icon: const Icon(Icons.upload_file),
+            onPressed: importSubject,
           ),
-        ],*/
+          IconButton(
+            icon: const Icon(Icons.folder_open),
+            onPressed: importFolder,
+          ),
+        ],
       ),
 
       body: subjects.isEmpty
@@ -263,24 +495,6 @@ void deleteSubject(int index) {
       onPressed: addSubject,
       child: const Icon(Icons.add),
     ),
-      /*floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () async {
-
-          final question =
-              await Navigator.push<Question>(
-            context,
-            MaterialPageRoute(
-              builder: (_) =>
-                  const AddQuestionPage(),
-            ),
-          );
-
-          if (question != null) {
-            addQuestion(question);
-          }
-        },
-      ),*/
     );
   }
 }
@@ -312,8 +526,7 @@ class _SubjectPageState extends State<SubjectPage> {
 
     if (question != null) {
 
-      setState(() {
-        widget.subject.questions.add(question);
+      setState(() {widget.subject.questions.add(question);
 
       });
     }
@@ -360,24 +573,6 @@ class _SubjectPageState extends State<SubjectPage> {
             onPressed: () {
               setState(() {
                 widget.subject.questions.removeAt(index);
-
-                // Renumber remaining questions
-                /*for (int i = 0;
-                    i < widget.subject.questions.length;
-                    i++) {
-
-                  final old =
-                      widget.subject.questions[i];
-
-                  widget.subject.questions[i] =
-                      Question(
-                    //number: i + 1,
-                    question: old.question,
-                    options: old.options,
-                    answer: old.answer,
-                    explanation: old.explanation,
-                  );
-                }*/
               });
 
               Navigator.pop(context);
@@ -463,6 +658,19 @@ Future<void> exportSubjectToFile() async {
         Icons.download,
       ),
       onPressed: exportSubjectToFile,
+    ),
+    IconButton(
+      icon: const Icon(Icons.visibility),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SubjectPreviewPage(
+              subject: widget.subject,
+            ),
+          ),
+        );
+      },
     ),
   ],
 ),
@@ -731,6 +939,222 @@ void initState() {
           ],
         ),
       ),
+    );
+  }
+}
+
+class SubjectPreviewPage extends StatefulWidget {
+
+  final Subject subject;
+
+  const SubjectPreviewPage({
+    super.key,
+    required this.subject,
+  });
+
+  @override
+  State<SubjectPreviewPage> createState() =>
+      _SubjectPreviewPageState();
+}
+
+class _SubjectPreviewPageState
+    extends State<SubjectPreviewPage> {
+
+  int currentQuestionIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+
+    if (widget.subject.questions.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.subject.name),
+        ),
+        body: const Center(
+          child: Text(
+            "No Questions Available",
+          ),
+        ),
+      );
+    }
+
+    final question =
+        widget.subject.questions[
+            currentQuestionIndex];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          '${widget.subject.name} Preview',
+        ),
+      ),
+
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+
+          children: [
+
+            Text(
+              'Question ${currentQuestionIndex + 1}'
+              ' of ${widget.subject.questions.length}',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge,
+            ),
+
+            const SizedBox(height: 24),
+
+            LatexText(
+              text: question.question,
+            ),
+
+            const SizedBox(height: 24),
+
+            Card(
+              child: ListTile(
+                title: Text(
+                  'A. ${question.options["A"]}',
+                ),
+              ),
+            ),
+
+            Card(
+              child: ListTile(
+                title: Text(
+                  'B. ${question.options["B"]}',
+                ),
+              ),
+            ),
+
+            Card(
+              child: ListTile(
+                title: Text(
+                  'C. ${question.options["C"]}',
+                ),
+              ),
+            ),
+
+            Card(
+              child: ListTile(
+                title: Text(
+                  'D. ${question.options["D"]}',
+                ),
+              ),
+            ),
+
+            const Spacer(),
+
+            Card(
+              child: Padding(
+                padding:
+                    const EdgeInsets.all(12),
+
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+
+                  children: [
+
+                    Text(
+                      'Correct Answer: '
+                      '${question.answer}',
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Text(
+                      question.explanation,
+                    ),
+
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            Row(
+              children: [
+
+                Expanded(
+                  child: FilledButton(
+                    onPressed:
+                        currentQuestionIndex > 0
+                            ? () {
+                                setState(() {
+                                  currentQuestionIndex--;
+                                });
+                              }
+                            : null,
+                    child: const Text(
+                      "Previous",
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 12),
+
+                Expanded(
+                  child: FilledButton(
+                    onPressed:
+                        currentQuestionIndex <
+                                widget.subject
+                                        .questions
+                                        .length -
+                                    1
+                            ? () {
+                                setState(() {
+                                  currentQuestionIndex++;
+                                });
+                              }
+                            : null,
+                    child: const Text(
+                      "Next",
+                    ),
+                  ),
+                ),
+
+              ],
+            ),
+
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class LatexText extends StatelessWidget {
+  final String text;
+
+  const LatexText({
+    super.key,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+
+    if (text.startsWith(r'$') &&
+        text.endsWith(r'$')) {
+
+      return Math.tex(
+        text
+            .replaceFirst(r'$', '')
+            .replaceAll(r'$', ''),
+        mathStyle: MathStyle.display,
+      );
+    }
+
+    return Text(
+      text,
+      style: Theme.of(context)
+          .textTheme
+          .titleMedium,
     );
   }
 }
