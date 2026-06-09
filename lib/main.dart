@@ -1016,33 +1016,73 @@ class _SubjectPreviewPageState
 
             Card(
               child: ListTile(
-                title: Text(
-                  'A. ${question.options["A"]}',
-                ),
+                title: Row(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    const Text('A. '),
+                    Expanded(
+                      child: LatexText(
+                        text:
+                            question.options["A"] ?? "",
+                      ),
+                    ),
+                  ],
+                )
               ),
             ),
 
             Card(
               child: ListTile(
-                title: Text(
-                  'B. ${question.options["B"]}',
-                ),
+                title: Row(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    const Text('B. '),
+                    Expanded(
+                      child: LatexText(
+                        text:
+                            question.options["B"] ?? "",
+                      ),
+                    ),
+                  ],
+                )
               ),
             ),
 
             Card(
               child: ListTile(
-                title: Text(
-                  'C. ${question.options["C"]}',
-                ),
+                title: Row(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    const Text('C. '),
+                    Expanded(
+                      child: LatexText(
+                        text:
+                            question.options["C"] ?? "",
+                      ),
+                    ),
+                  ],
+                )
               ),
             ),
 
             Card(
               child: ListTile(
-                title: Text(
-                  'D. ${question.options["D"]}',
-                ),
+                title: Row(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    const Text('D. '),
+                    Expanded(
+                      child: LatexText(
+                        text:
+                            question.options["D"] ?? "",
+                      ),
+                    ),
+                  ],
+                )
               ),
             ),
 
@@ -1066,8 +1106,9 @@ class _SubjectPreviewPageState
 
                     const SizedBox(height: 8),
 
-                    Text(
-                      question.explanation,
+                    LatexText(
+                      text: question.explanation,
+                      fontSize: 16,
                     ),
 
                   ],
@@ -1130,31 +1171,112 @@ class _SubjectPreviewPageState
 
 class LatexText extends StatelessWidget {
   final String text;
+  final double fontSize;
 
   const LatexText({
     super.key,
     required this.text,
+    this.fontSize = 18,
   });
 
   @override
   Widget build(BuildContext context) {
+final regex = RegExp(r'\$(.*?)\$');
 
-    if (text.startsWith(r'$') &&
-        text.endsWith(r'$')) {
+    final underlineRegex =
+        RegExp(r'<u>(.*?)<\/u>');
 
-      return Math.tex(
-        text
-            .replaceFirst(r'$', '')
-            .replaceAll(r'$', ''),
-        mathStyle: MathStyle.display,
+    if (!regex.hasMatch(text) &&
+        !underlineRegex.hasMatch(text)) {
+
+      return Text(
+        text,
+        style: TextStyle(
+          fontSize: fontSize,
+        ),
       );
     }
 
-    return Text(
-      text,
-      style: Theme.of(context)
-          .textTheme
-          .titleMedium,
+    List<InlineSpan> spans = [];
+
+    int lastIndex = 0;
+
+    final combinedRegex =
+        RegExp(r'\$(.*?)\$|<u>(.*?)<\/u>');
+
+    for (final match
+        in combinedRegex.allMatches(text)) {
+
+      if (match.start > lastIndex) {
+
+        spans.add(
+          TextSpan(
+            text: text.substring(
+              lastIndex,
+              match.start,
+            ),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: fontSize,
+            ),
+          ),
+        );
+      }
+
+      if (match.group(1) != null) {
+
+        spans.add(
+          WidgetSpan(
+            alignment:
+                PlaceholderAlignment.middle,
+
+            child: Math.tex(
+              match.group(1)!,
+              textStyle: TextStyle(
+                fontSize: fontSize,
+              ),
+            ),
+          ),
+        );
+      }
+
+      else if (match.group(2) != null) {
+
+        spans.add(
+          TextSpan(
+            text: match.group(2)!,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: fontSize,
+              decoration:
+                  TextDecoration.underline,
+            ),
+          ),
+        );
+      }
+
+      lastIndex = match.end;
+    }
+
+    if (lastIndex < text.length) {
+
+      spans.add(
+        TextSpan(
+          text: text.substring(lastIndex),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: fontSize,
+          ),
+        ),
+      );
+    }
+
+    return RichText(
+      softWrap: true,
+      overflow: TextOverflow.visible,
+      text: TextSpan(
+        children: spans,
+      ),
     );
   }
 }
