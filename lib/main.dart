@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 //import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:image_picker/image_picker.dart';
 
 void main() {
   runApp(const KojaQuestionBuilder());
@@ -59,7 +60,6 @@ class Subject {
 }
 
 class Question {
-  //final int? number;
   final String question;
 
   final Map<String, String> options;
@@ -68,18 +68,20 @@ class Question {
 
   final String explanation;
 
+  final String? imagePath;
+
   Question({
-    //this.number,
     required this.question,
     required this.options,
     required this.answer,
     required this.explanation,
+    this.imagePath,
   });
 
   Map<String, dynamic> toJson() {
     return {
-      // "number": number,
       "question": question,
+      "image": imagePath,
       "options": options,
       "answer": answer,
       "explanation": explanation,
@@ -90,14 +92,15 @@ class Question {
     Map<String, dynamic> json,
   ) {
     return Question(
-      question: json['question'],
+      question: json["question"],
+      imagePath: json["image"],
       options:
           Map<String, String>.from(
-        json['options'],
+        json["options"],
       ),
-      answer: json['answer'],
+      answer: json["answer"],
       explanation:
-          json['explanation'],
+          json["explanation"] ?? "",
     );
   }
 }
@@ -585,36 +588,112 @@ class _SubjectPageState extends State<SubjectPage> {
   );
 }
 Future<void> exportSubjectToFile() async {
-  try {
 
-    final jsonString =
-        const JsonEncoder.withIndent('  ')
-            .convert(widget.subject.toJson());
+  try {
 
     final documentsDir =
         await getApplicationDocumentsDirectory();
 
-    final kojaFolder = Directory(
-      '${documentsDir.path}/Koja Question Banks',
+    final rootFolder = Directory(
+      '${documentsDir.path}/Koja Question Banks/questions',
     );
 
-    if (!await kojaFolder.exists()) {
-      await kojaFolder.create(
+    if (!await rootFolder.exists()) {
+      await rootFolder.create(
         recursive: true,
       );
     }
+
+    /*final subjectFolder = Directory(
+      '${rootFolder.path}/${widget.subject.name}',
+    );
+
+    await subjectFolder.create(
+      recursive: true,
+    );*/
+
+    final imagesFolder = Directory(
+      '${documentsDir.path}/Koja Question Banks/images',
+    );
+
+    await imagesFolder.create(
+      recursive: true,
+    );
+
+    List<Map<String, dynamic>>
+        exportQuestions = [];
+
+    for (
+      int index = 0;
+      index < widget.subject.questions.length;
+      index++
+    ) {
+
+      final question =
+          widget.subject.questions[index];
+
+      String? imagePath;
+
+      if (question.imagePath != null &&
+          question.imagePath!.isNotEmpty) {
+
+        final extension =
+            question.imagePath!
+                .split('.')
+                .last;
+
+        await File(
+          question.imagePath!,
+        ).copy(
+          '${imagesFolder.path}/q${index + 1}.$extension',
+        );
+
+        imagePath =
+            'images/q${index + 1}.$extension';
+      }
+
+      exportQuestions.add({
+
+        "question":
+            question.question,
+
+        "image":
+            imagePath,
+
+        "options":
+            question.options,
+
+        "answer":
+            question.answer,
+
+        "explanation":
+            question.explanation,
+
+      });
+    }
+
+    final jsonData = {
+
+      "subjectName":
+          widget.subject.name,
+
+      "questions":
+          exportQuestions,
+
+    };
 
     final fileName =
         widget.subject.name
             .toLowerCase()
             .replaceAll(' ', '_');
 
-    final file = File(
-      '${kojaFolder.path}/$fileName.json',
+    final jsonFile = File(
+      '${documentsDir.path}/Koja Question Banks/questions/$fileName.json',
     );
 
-    await file.writeAsString(
-      jsonString,
+    await jsonFile.writeAsString(
+      const JsonEncoder.withIndent('  ')
+          .convert(jsonData),
     );
 
     if (!mounted) return;
@@ -623,7 +702,7 @@ Future<void> exportSubjectToFile() async {
         .showSnackBar(
       SnackBar(
         content: Text(
-          'Exported to ${file.path}',
+          'Exported to ${rootFolder.path}',
         ),
       ),
     );
@@ -777,6 +856,27 @@ class _AddQuestionPageState
 
   String answer = "A";
 
+  // NEW
+  File? selectedImage;
+
+  // NEW
+  Future<void> pickImage() async {
+
+    final picker = ImagePicker();
+
+    final file =
+        await picker.pickImage(
+      source: ImageSource.gallery,
+    );
+
+    if (file == null) return;
+
+    setState(() {
+      selectedImage =
+          File(file.path);
+    });
+  }
+
   @override
 void initState() {
   super.initState();
@@ -801,6 +901,12 @@ void initState() {
 
     explanationController.text =
         widget.question!.explanation;
+  }
+  if (widget.question?.imagePath != null) {
+
+  selectedImage = File(
+    widget.question!.imagePath!,
+  );
   }
 }
 
@@ -910,11 +1016,33 @@ void initState() {
 
             const SizedBox(height: 30),
 
+            const SizedBox(height: 20),
+
+            OutlinedButton.icon(
+              onPressed: pickImage,
+              icon: const Icon(Icons.image),
+              label: const Text(
+                "Add Image",
+              ),
+            ),
+
+            if (selectedImage != null) ...[
+              const SizedBox(height: 12),
+
+              Image.file(
+                selectedImage!,
+                height: 200,
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
             FilledButton(
               onPressed: () {
 
                 final question = Question(
                     question: questionController.text,
+                    imagePath: selectedImage?.path,
                     options: {
                       "A": aController.text,
                       "B": bController.text,
@@ -992,6 +1120,12 @@ class _SubjectPreviewPageState
       body: Padding(
         padding: const EdgeInsets.all(16),
 
+      child: Column(
+          children: [
+
+            Expanded(
+
+        child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment:
               CrossAxisAlignment.start,
@@ -1007,6 +1141,20 @@ class _SubjectPreviewPageState
             ),
 
             const SizedBox(height: 24),
+
+            if (question.imagePath != null)
+              Padding(
+                padding: const EdgeInsets.only(
+                  bottom: 16,
+                ),
+                child: InteractiveViewer(
+                  child: Image.file(
+                    File(question.imagePath!),
+                    height: 250,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
 
             LatexText(
               text: question.question,
@@ -1086,7 +1234,7 @@ class _SubjectPreviewPageState
               ),
             ),
 
-            const Spacer(),
+            const SizedBox(height: 24),
 
             Card(
               child: Padding(
@@ -1164,6 +1312,10 @@ class _SubjectPreviewPageState
 
           ],
         ),
+        ),
+      ),
+          ],
+      ),
       ),
     );
   }
